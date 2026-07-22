@@ -1,0 +1,153 @@
+name: Build Intel Bundle
+
+on:
+  schedule:
+    - cron: '0 3 * * 6'  # Saturday 03:00 UTC
+  push:
+    branches: [main]
+    paths:
+      - 'sources.yaml'
+      - 'rules/**'
+      - 'grafana/**'
+      - 'updater/**'
+  workflow_dispatch:
+
+permissions:
+  contents: write    # create GitHub Releases
+  packages: write    # push to GHCR
+  id-token: write    # cosign keyless OIDC
+
+env:
+  REGISTRY: ghcr.io
+  IMAGE_UPDATER: ghcr.io/${{ github.repository_owner }}/nous/updater
+  IMAGE_BUNDLE: ghcr.io/${{ github.repository_owner }}/nous
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install tools
+        env:
+          ORAS_VERSION: "1.2.0"
+          COSIGN_VERSION: "2.4.1"
+          SYFT_VERSION: "1.19.0"
+        run: |
+          set -euo pipefail
+          ARCH=$(uname -m | sed 's/x86_64/amd64/;s/aarch64/arm64/')
+
+          # oras
+          wget -qO /tmp/oras.tar.gz \
+            "https://github.com/oras-project/oras/releases/download/v${ORAS_VERSION}/oras_${ORAS_VERSION}_linux_${ARCH}.tar.gz"
+          tar -xzf /tmp/oras.tar.gz -C /usr/local/bin oras
+
+          # cosign
+          wget -qO /usr/local/bin/cosign \
+            "https://github.com/sigstore/cosign/releases/download/v${COSIGN_VERSION}/cosign-linux-${ARCH}"
+          chmod +x /usr/local/bin/cosign
+
+          # syft
+          curl -sSfL "https://github.com/anchore/syft/releases/download/v${SYFT_VERSION}/syft_${SYFT_VERSION}_linux_${ARCH}.tar.gz" \
+            | tar -xzf - -C /usr/local/bin syft
+
+          pip install --quiet pyyaml
+
+      - name: Set build metadata
+        id: meta
+        run: |
+          DATE=$(date -u +%Y-%m-%d)
+          echo "date=${DATE}" >> $GITHUB_OUTPUT
+          echo "BUILD_DATE=${DATE}" >> $GITHUB_ENV
+
+      - name: Download intel packs
+        run: |
+          mkdir -p /tmp/intel-build
+          python3 updater/src/nous-update.py \
+            --sources sources.yaml \
+            bundle /tmp/intel-build
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Bundle panops-authored content
+        run: |
+          mkdir -p /tmp/intel-build/rules/panops /tmp/intel-build/grafana
+          cp -r rules/. /tmp/intel-build/rules/panops/
+          cp -r grafana/. /tmp/intel-build/grafana/
+
+      - name: Create ZIP bundle
+        run: |
+          BUNDLE="nous-${BUILD_DATE}.zip"
+          cd /tmp/intel-build
+          zip -r "/tmp/${BUNDLE}" .
+          echo "BUNDLE_PATH=/tmp/${BUNDLE}" >> $GITHUB_ENV
+          echo "BUNDLE_NAME=${BUNDLE}" >> $GITHUB_ENV
+          sha256sum "/tmp/${BUNDLE}" | tee /tmp/bundle.sha256
+          echo "Bundle size: $(du -sh /tmp/${BUNDLE} | cut -f1)"
+
+      - name: Log in to GHCR
+        uses: docker/login-action@v3
+        with:
+          registry: ${{ env.REGISTRY }}
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+
+      - name: Push OCI artifact
+        run: |
+          cp "${BUNDLE_PATH}" "${BUNDLE_NAME}"
+          oras push "${IMAGE_BUNDLE}:${BUILD_DATE}" "${BUNDLE_NAME}:application/zip"
+          oras tag  "${IMAGE_BUNDLE}:${BUILD_DATE}" "${IMAGE_BUNDLE}:latest"
+
+      - name: Generate SBOM
+        run: syft "${BUNDLE_PATH}" -o spdx-json > /tmp/sbom.spdx.json
+
+      - name: Sign OCI artifact (cosign keyless)
+        run: |
+          cosign sign --yes "${IMAGE_BUNDLE}:${BUILD_DATE}"
+          cosign sign --yes "${IMAGE_BUNDLE}:latest"
+
+      - name: Attest SBOM on OCI artifact
+        run: |
+          cosign attest --yes \
+            --predicate /tmp/sbom.spdx.json \
+            --type spdxjson \
+            "${IMAGE_BUNDLE}:${BUILD_DATE}"
+
+      - name: Sign tarball (cosign sign-blob)
+        run: |
+          cosign sign-blob --yes \
+            --bundle /tmp/bundle.json \
+            "${BUNDLE_PATH}"
+
+      - name: Build and push updater image
+        uses: docker/build-push-action@v6
+        with:
+          context: .
+          file: updater/Dockerfile
+          push: true
+          tags: |
+            ${{ env.IMAGE_UPDATER }}:latest
+            ${{ env.IMAGE_UPDATER }}:${{ steps.meta.outputs.date }}
+
+      - name: Sign updater image
+        run: cosign sign --yes "${IMAGE_UPDATER}:${{ steps.meta.outputs.date }}"
+
+      - name: Create GitHub Release
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: intel-${{ steps.meta.outputs.date }}
+          name: Intel Bundle ${{ steps.meta.outputs.date }}
+          body: |
+            Weekly intel bundle — signed with cosign keyless (Sigstore/Fulcio).
+
+            **Verify before applying:** see [VERIFICATION.md](https://github.com/${{ github.repository }}/blob/main/VERIFICATION.md)
+
+            **Bundle contents:** SigmaHQ rules · YARA-Forge · Signature-Base · ET Open (Suricata) ·
+            MITRE ATT&CK · CISA KEV · kubernetes-mixin · node-exporter-mixin · etcd-mixin ·
+            awesome-prometheus-alerts · Pyrra SLO examples · K8s runbooks · PanOps custom rules + dashboards
+          files: |
+            ${{ env.BUNDLE_PATH }}
+            /tmp/bundle.json
+            /tmp/sbom.spdx.json
+            /tmp/bundle.sha256

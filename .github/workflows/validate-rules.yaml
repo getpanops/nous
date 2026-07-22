@@ -1,0 +1,67 @@
+name: Validate Rules
+
+on:
+  pull_request:
+    paths:
+      - 'rules/**'
+      - 'sources.yaml'
+      - 'grafana/**'
+      - 'updater/**'
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+
+      - name: Install dependencies
+        run: |
+          pip install pyyaml sigma-cli yara-python
+
+      - name: Validate sources.yaml
+        run: |
+          python3 -c "
+          import yaml
+          d = yaml.safe_load(open('sources.yaml'))
+          packs = sum(len(v) for v in d.values() if isinstance(v, dict))
+          print(f'sources.yaml OK: {packs} packs defined')
+          "
+
+      - name: Validate Sigma rules syntax
+        run: |
+          if [ -d rules/sigma/rules ]; then
+            sigma check rules/sigma/rules/ && echo "Sigma rules OK"
+          else
+            echo "No Sigma rules directory — skipping"
+          fi
+
+      - name: Validate YARA rules compile
+        run: |
+          if [ -d rules/yara ]; then
+            find rules/yara -name '*.yar' -o -name '*.yara' | while read f; do
+              python3 -c "import yara; yara.compile(filepath='$f')" && echo "OK: $f" || exit 1
+            done
+            echo "YARA rules OK"
+          else
+            echo "No YARA rules directory — skipping"
+          fi
+
+      - name: Validate Grafana YAML
+        run: |
+          find grafana/ -name '*.yaml' -o -name '*.yml' 2>/dev/null | while read f; do
+            python3 -c "import yaml; yaml.safe_load(open('$f'))" && echo "OK: $f" || exit 1
+          done
+
+      - name: Validate nous-update.py syntax
+        run: python3 -m py_compile updater/src/nous-update.py && echo "Python syntax OK"
+
+      - name: Validate GHA workflow YAML
+        run: |
+          python3 -c "import yaml; yaml.safe_load(open('.github/workflows/build-bundle.yaml'))" \
+            && echo "build-bundle.yaml OK"

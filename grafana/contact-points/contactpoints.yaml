@@ -1,0 +1,66 @@
+apiVersion: 1
+contactPoints:
+  # SRE and SOC alerts route through PanOps which gates and formats notifications
+  # before sending to your configured notification channel.
+  - orgId: 1
+    name: SRE Alerts
+    receivers:
+      - uid: sre-panops
+        type: webhook
+        settings:
+          url: http://panops-assembler.panops.svc.cluster.local:8080/webhook
+          httpMethod: POST
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: SOC Alerts
+    receivers:
+      - uid: soc-panops
+        type: webhook
+        settings:
+          url: http://panops-assembler.panops.svc.cluster.local:8080/webhook
+          httpMethod: POST
+        disableResolveMessage: false
+
+  # CVE alerts bypass PanOps and go direct to your notification endpoint.
+  # Replace the URL below with your webhook (Slack, Teams, Matrix, PagerDuty, etc.)
+  - orgId: 1
+    name: SOC CVE New
+    receivers:
+      - uid: soc-cve-new
+        type: webhook
+        settings:
+          url: http://your-notification-endpoint/grafana
+          httpMethod: POST
+        disableResolveMessage: true
+
+  - orgId: 1
+    name: SOC CVE Digest
+    receivers:
+      - uid: soc-cve-digest
+        type: webhook
+        settings:
+          url: http://your-notification-endpoint/grafana
+          httpMethod: POST
+        disableResolveMessage: true
+
+  # NOC / platform alerts bypass PanOps assembler so they still fire
+  # even when the assembler itself is down. Replace URL with your endpoint.
+  - orgId: 1
+    name: NOC Alerts
+    receivers:
+      - uid: noc-webhook
+        type: webhook
+        settings:
+          url: http://your-notification-endpoint/grafana
+          httpMethod: POST
+        disableResolveMessage: false
+
+  - orgId: 1
+    name: email-critical
+    receivers:
+      - uid: email-critical
+        type: email
+        settings:
+          addresses: you@example.com
+        disableResolveMessage: true

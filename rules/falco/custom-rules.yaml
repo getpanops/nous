@@ -1,0 +1,31 @@
+apiVersion: artifact.falcosecurity.dev/v1alpha1
+kind: Rulesfile
+metadata:
+  name: falco-custom-rules
+  namespace: security
+spec:
+  # Priority 90 > base rules (50) so overrides load after; max valid value is 99
+  priority: 90
+  inlineRules:
+    # Gitaly legitimately writes and executes temporary helper binaries under /tmp/gitaly-*
+    # (e.g. gitaly-git2go, gitaly-lfssmudge) as part of normal Git RPC operations.
+    - rule: Drop and execute new binary in container
+      exceptions:
+        - name: gitaly_tmp_helpers
+          fields:
+            - container.name
+            - proc.exepath
+          comps:
+            - "="
+            - startswith
+          values:
+            - - gitaly
+              - /tmp/gitaly-
+      append: true
+    # CNI plugins (/opt/cni/bin/ and /hostroot/opt/cni/bin/ for multus) are host-provisioned
+    # binaries invoked by containerd and multus-daemon during normal pod network setup.
+    - rule: Drop and execute new binary in container
+      condition: >-
+        and not proc.exepath startswith "/opt/cni/bin/"
+        and not proc.exepath startswith "/hostroot/opt/cni/bin/"
+      append: true

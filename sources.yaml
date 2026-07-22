@@ -1,0 +1,136 @@
+# nous source catalog
+# Renovate manages pinned versions — opens a PR when upstream releases a new version.
+# Pattern: # renovate: datasource=github-releases depName=ORG/REPO
+#           version: "vX.Y.Z"
+
+security:
+  sigmahq_core:
+    description: "SigmaHQ community detection rules — Linux, Windows, Cloud, Network"
+    # renovate: datasource=github-releases depName=SigmaHQ/sigma
+    version: "r2025-06-26"
+    url: "https://github.com/SigmaHQ/sigma/releases/download/{version}/sigma_all_rules.zip"
+    dest: "sigma/community"
+    type: zip
+    license: "DRL 1.1"
+
+  yara_forge_full:
+    description: "YARA-Forge curated ruleset — high-confidence malware detection"
+    # renovate: datasource=github-releases depName=YARAHQ/yara-forge
+    version: "v1.0.4"
+    url: "https://github.com/YARAHQ/yara-forge/releases/download/{version}/yara-forge-rules-full.zip"
+    dest: "yara/forge"
+    type: zip
+    license: "Various (per-rule)"
+    license_note: "YARA-Forge curation layer is CC BY 4.0; underlying rules carry their original per-rule licenses. Self-hosted use is fine; review individual rules before commercial redistribution."
+
+  signature_base:
+    description: "Florian Roth's signature-base — YARA rules from incident response"
+    url: "https://github.com/Neo23x0/signature-base/archive/refs/heads/master.zip"
+    dest: "yara/signature-base"
+    type: zip
+    subpath: "signature-base-master/yara"
+    license: "CC BY-NC 4.0"
+    license_note: "NonCommercial clause — do NOT include in commercially redistributed bundles. Safe for self-hosted, non-commercial detection use."
+    schedule: weekly
+
+  et_open_suricata:
+    description: "Emerging Threats Open rules for Suricata — network IDS signatures"
+    url: "https://rules.emergingthreats.net/open/suricata-7.0/emerging.rules.tar.gz"
+    dest: "suricata"
+    type: targz
+    license: "BSD"
+    schedule: weekly
+
+  mitre_attack_enterprise:
+    description: "MITRE ATT&CK Enterprise STIX bundle — TTP taxonomy"
+    # renovate: datasource=github-releases depName=mitre-attack/attack-stix-data
+    version: "v16.1"
+    url: "https://github.com/mitre-attack/attack-stix-data/releases/download/{version}/enterprise-attack-{version}.json"
+    dest: "cti"
+    type: file
+    license: "CC BY 4.0"
+
+  cisa_kev:
+    description: "CISA Known Exploited Vulnerabilities catalog — authoritative list of CVEs being actively exploited"
+    url: "https://www.cisa.gov/sites/default/files/feeds/known_exploited_vulnerabilities.json"
+    dest: "cti/cisa-kev.json"
+    type: file
+    license: "Public Domain (US Government)"
+    schedule: daily
+
+  elastic_detection_rules:
+    description: "Elastic Security detection rules — Windows + Linux"
+    url: "https://github.com/elastic/detection-rules/archive/refs/heads/main.zip"
+    dest: "sigma/elastic"
+    type: zip
+    subpath: "detection-rules-main/rules"
+    license: "Elastic License 2.0"
+    license_note: "EL2 permits self-hosted use but prohibits providing as a managed/SaaS service to third parties. Use as reference only; do not redistribute converted rules commercially."
+    note: "Use directly as reference; convert via elastic2sigma for Sigma format"
+    schedule: weekly
+
+operations:
+  kubernetes_mixin:
+    description: "kubernetes-mixin — Prometheus alerting rules and Grafana dashboards for K8s"
+    url: "https://github.com/kubernetes-monitoring/kubernetes-mixin/archive/refs/heads/master.zip"
+    dest: "mixins/kubernetes-mixin"
+    type: zip
+    subpath: "kubernetes-mixin-master"
+    note: "Jsonnet source — compile with jsonnet-bundler for prometheus_alerts.yaml"
+    license: "Apache 2.0"
+    schedule: weekly
+
+  node_exporter_mixin:
+    description: "node_exporter alerting rules and dashboards for host-level metrics"
+    url: "https://github.com/prometheus/node_exporter/archive/refs/heads/master.zip"
+    dest: "mixins/node-exporter"
+    type: zip
+    subpath: "node_exporter-master/docs/node-mixin"
+    license: "Apache 2.0"
+    schedule: weekly
+
+  etcd_mixin:
+    description: "etcd alerting rules — disk I/O, leader election, compaction, peer latency"
+    url: "https://github.com/etcd-io/etcd/archive/refs/heads/main.zip"
+    dest: "mixins/etcd"
+    type: zip
+    subpath: "etcd-main/contrib/mixin"
+    license: "Apache 2.0"
+    schedule: weekly
+
+  awesome_prometheus_alerts:
+    description: "Awesome Prometheus Alerts — community alert rules for 30+ services"
+    url: "https://github.com/samber/awesome-prometheus-alerts/archive/refs/heads/master.zip"
+    dest: "mixins/awesome-prometheus-alerts"
+    type: zip
+    subpath: "awesome-prometheus-alerts-master/dist"
+    license: "MIT"
+    schedule: weekly
+
+  pyrra_slo_examples:
+    description: "Pyrra SLO definition examples — availability, latency, error rate patterns"
+    # renovate: datasource=github-releases depName=pyrra-dev/pyrra
+    version: "v0.7.10"
+    url: "https://github.com/pyrra-dev/pyrra/archive/refs/tags/{version}.zip"
+    dest: "slo/pyrra-examples"
+    type: zip
+    subpath: "pyrra-{version}/examples"
+    license: "Apache 2.0"
+
+  openslo_examples:
+    description: "OpenSLO spec examples — vendor-neutral SLO definitions"
+    url: "https://github.com/OpenSLO/OpenSLO/archive/refs/heads/main.zip"
+    dest: "slo/openslo-examples"
+    type: zip
+    subpath: "OpenSLO-main/examples"
+    license: "Apache 2.0"
+    schedule: weekly
+
+  k8s_runbooks:
+    description: "Container Solutions K8s runbooks — troubleshooting guides for K8s issues"
+    url: "https://github.com/containersolutions/runbooks/archive/refs/heads/master.zip"
+    dest: "runbooks/k8s"
+    type: zip
+    subpath: "runbooks-master/content/posts"
+    license: "Apache 2.0"
+    schedule: weekly

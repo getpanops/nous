@@ -58,6 +58,15 @@ security:
     license: "Public Domain (US Government)"
     schedule: daily
 
+  loldrivers:
+    description: "LOLDrivers — known vulnerable/malicious Windows drivers with hashes and metadata"
+    # renovate: datasource=github-releases depName=magicsword-io/LOLDrivers
+    version: "v2.0.0"
+    url: "https://github.com/magicsword-io/LOLDrivers/releases/download/{version}/drivers.zip"
+    dest: "cti/loldrivers"
+    type: zip
+    license: "Apache 2.0"
+
   elastic_detection_rules:
     description: "Elastic Security detection rules — Windows + Linux"
     url: "https://github.com/elastic/detection-rules/archive/refs/heads/main.zip"
